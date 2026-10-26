@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import streamlit as st
 import pandas as pd
 import openpyxl
@@ -79,16 +80,30 @@ if pdf_file and excel_molde:
                     TEXTO: {texto_pagina}
                     """
                     
-                    # Actualizado al modelo actual de tu AI Studio
-                    resp = client.models.generate_content(
-                        model="gemini-3.8-flash",
-                        contents=prompt_ia,
-                        config=types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json")
-                    )
+                    # Sistema con reintento automático ante errores temporales 503
+                    exito = False
+                    intentos = 3
+                    datos = {}
                     
-                    datos = json.loads(resp.text)
+                    for intento in range(intentos):
+                        try:
+                            resp = client.models.generate_content(
+                                model="gemini-3.8-flash",
+                                contents=prompt_ia,
+                                config=types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json")
+                            )
+                            datos = json.loads(resp.text)
+                            exito = True
+                            break
+                        except Exception as api_err:
+                            if intento < intentos - 1:
+                                time.sleep(2) # Espera 2 segundos antes de reintentar
+                            else:
+                                raise api_err
+                    
+                    time.sleep(1) # Pausa preventiva de 1 segundo por partida para cuidar la API
+                    
                     fila_comp = 10 + partidas_procesadas
-                    
                     ws_comp[f"B{fila_comp}"] = datos.get("numero_partida", partidas_procesadas)
                     ws_comp[f"C{fila_comp}"] = datos.get("descripcion_partida", "")
                     ws_comp[f"D{fila_comp}"] = datos.get("unidad", "UND")
