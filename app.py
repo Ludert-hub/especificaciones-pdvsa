@@ -80,28 +80,25 @@ if pdf_file and excel_molde:
                     TEXTO: {texto_pagina}
                     """
                     
-                    # Sistema con reintento automático ante errores temporales 503
-                    exito = False
-                    intentos = 3
+                    # Usamos gemini-2.5-pro que ofrece alta estabilidad en bucles
                     datos = {}
-                    
+                    intentos = 5
                     for intento in range(intentos):
                         try:
                             resp = client.models.generate_content(
-                                model="gemini-3.8-flash",
+                                model="gemini-2.5-pro",
                                 contents=prompt_ia,
                                 config=types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json")
                             )
                             datos = json.loads(resp.text)
-                            exito = True
                             break
-                        except Exception as api_err:
+                        except Exception as err:
                             if intento < intentos - 1:
-                                time.sleep(2) # Espera 2 segundos antes de reintentar
+                                time.sleep(4 * (intento + 1)) # Espera progresiva de 4s, 8s, 12s...
                             else:
-                                raise api_err
+                                raise err
                     
-                    time.sleep(1) # Pausa preventiva de 1 segundo por partida para cuidar la API
+                    time.sleep(1.5) # Pausa de seguridad
                     
                     fila_comp = 10 + partidas_procesadas
                     ws_comp[f"B{fila_comp}"] = datos.get("numero_partida", partidas_procesadas)
