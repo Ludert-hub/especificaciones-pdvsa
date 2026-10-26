@@ -13,7 +13,6 @@ st.set_page_config(page_title="Generador de Especificaciones PDVSA", page_icon="
 st.title("🏗️ Automatizador de Especificaciones Técnicas (PDVSA)")
 st.markdown("Herramienta automatizada para transformar Análisis de Precios Unitarios (APU) en Especificaciones Técnicas oficiales con membrete de PDVSA, sin precios unitarios.")
 
-# Configuración de API Key
 api_key_secret = st.secrets.get("GEMINI_API_KEY", "")
 st.sidebar.header("🔑 Configuración")
 api_key_input = st.sidebar.text_input("API Key de Google AI Studio", value=api_key_secret, type="password")
@@ -35,12 +34,10 @@ if pdf_file and excel_molde:
     if st.button("🚀 Generar Archivo de Especificaciones PDVSA", type="primary"):
         with st.spinner("Procesando documento PDF y generando especificaciones con IA..."):
             try:
-                # Leer PDF
                 reader = PdfReader(pdf_file)
                 total_paginas = len(reader.pages)
                 st.info(f"📄 Procesando {total_paginas} páginas de análisis de precios...")
                 
-                # Cargar molde de Excel con openpyxl
                 wb = openpyxl.load_workbook(excel_molde)
                 if "COMPUTOS" not in wb.sheetnames or "ESPECIFICACIONES" not in wb.sheetnames:
                     st.error("❌ El archivo Excel adjunto no tiene las pestañas requeridas ('COMPUTOS' y 'ESPECIFICACIONES').")
@@ -49,9 +46,7 @@ if pdf_file and excel_molde:
                 ws_comp = wb["COMPUTOS"]
                 ws_esp = wb["ESPECIFICACIONES"]
                 
-                # Procesar cada página (partida por partida)
                 partidas_procesadas = 0
-                
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 
@@ -64,7 +59,6 @@ if pdf_file and excel_molde:
                     status_text.text(f"Procesando partida de la página {idx + 1} de {total_paginas}...")
                     progress_bar.progress((idx + 1) / total_paginas)
                     
-                    # Prompt estricto para extraer y redactar sin precios
                     prompt_ia = f"""
                     Extrae del siguiente APU la información solicitada en formato JSON estricto:
                     {{
@@ -85,23 +79,21 @@ if pdf_file and excel_molde:
                     TEXTO: {texto_pagina}
                     """
                     
+                    # Actualizado al modelo actual de tu AI Studio
                     resp = client.models.generate_content(
-                        model="gemini-2.5-flash",
+                        model="gemini-3.8-flash",
                         contents=prompt_ia,
                         config=types.GenerateContentConfig(temperature=0.0, response_mime_type="application/json")
-                    
                     )
                     
                     datos = json.loads(resp.text)
                     fila_comp = 10 + partidas_procesadas
                     
-                    # Escribir en hoja COMPUTOS
                     ws_comp[f"B{fila_comp}"] = datos.get("numero_partida", partidas_procesadas)
                     ws_comp[f"C{fila_comp}"] = datos.get("descripcion_partida", "")
                     ws_comp[f"D{fila_comp}"] = datos.get("unidad", "UND")
                     ws_comp[f"E{fila_comp}"] = datos.get("cantidad_partida", 1.0)
                     
-                    # Escribir bloque en ESPECIFICACIONES (bloques de 78 filas)
                     offset = (partidas_procesadas - 1) * 78
                     ws_esp[f"L{6 + offset}"] = f"=+COMPUTOS!B{fila_comp}"
                     ws_esp[f"L{9 + offset}"] = f"=+COMPUTOS!D{fila_comp}"
@@ -118,20 +110,17 @@ if pdf_file and excel_molde:
                     ws_esp[f"A{70 + offset}"] = datos.get("medida_y_forma_de_pago", "")
                     ws_esp[f"A{72 + offset}"] = datos.get("no_conformidad", "")
                     
-                    # Materiales
                     for i, mat in enumerate(datos.get("materiales", [])[:12]):
                         r = 22 + offset + i
                         ws_esp[f"A{r}"] = mat.get("descripcion", "")
                         ws_esp[f"G{r}"] = mat.get("unidad", "")
                         ws_esp[f"H{r}"] = mat.get("cantidad", 0)
                         
-                    # Equipos
                     for i, eq in enumerate(datos.get("equipos", [])[:15]):
                         r = 36 + offset + i
                         ws_esp[f"A{r}"] = eq.get("descripcion", "")
                         ws_esp[f"H{r}"] = eq.get("cantidad", 0)
                         
-                    # Mano de Obra
                     for i, mo in enumerate(datos.get("mano_de_obra", [])[:15]):
                         r = 52 + offset + i
                         ws_esp[f"A{r}"] = mo.get("descripcion", "")
@@ -140,7 +129,6 @@ if pdf_file and excel_molde:
                 status_text.text("¡Proceso completado con éxito!")
                 progress_bar.progress(1.0)
                 
-                # Guardar en memoria para descarga
                 output = BytesIO()
                 wb.save(output)
                 output.seek(0)
